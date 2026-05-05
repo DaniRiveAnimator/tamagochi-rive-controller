@@ -1,0 +1,212 @@
+.app-shell {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: #101114;
+  color: #f6f4ef;
+}
+
+.rive-stage {
+  min-height: 720px;
+  display: grid;
+  grid-template-rows: 280px 360px;
+  place-items: center;
+  gap: 28px;
+  padding: 34px 24px 28px;
+}
+
+.block-button-hitarea {
+  width: min(760px, 100%);
+  height: 280px;
+  position: relative;
+  user-select: none;
+}
+
+.block-button-target {
+  position: absolute;
+  left: 33.5%;
+  top: 6%;
+  width: 34.5%;
+  height: 92%;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  z-index: 1;
+}
+
+.block-button-target:focus-visible {
+  outline: 2px solid #f0c349;
+  outline-offset: 6px;
+}
+
+.block-button-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.healthbar-canvas {
+  width: min(880px, 100%);
+  height: 360px;
+}
+
+.control-panel {
+  border-top: 1px solid #30323a;
+  background: #18191f;
+  padding: 18px 24px 22px;
+  display: grid;
+  gap: 22px;
+}
+
+.control-group {
+  display: grid;
+  gap: 16px;
+}
+
+.control-group + .control-group {
+  border-top: 1px solid #30323a;
+  padding-top: 20px;
+}
+
+.control-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.control-header h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 650;
+}
+
+.control-header p {
+  margin: 6px 0 0;
+  color: #a8adb8;
+  font-size: 13px;
+}
+
+.value-readout {
+  min-width: 72px;
+  border: 1px solid #3a3d48;
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-align: center;
+  font: 700 22px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #101114;
+  background: #f6f4ef;
+}
+
+.slider-row {
+  display: grid;
+  gap: 10px;
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: #f0c349;
+}
+
+.tick-row {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  color: #a8adb8;
+  font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.tick-row span {
+  text-align: center;
+}
+
+.tick-row span:first-child {
+  text-align: left;
+}
+
+.tick-row span:last-child {
+  text-align: right;
+}
+
+.tick-row-four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.toggle-row {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #d7d9df;
+  font-size: 14px;
+}
+
+.toggle-row input {
+  width: 18px;
+  height: 18px;
+  accent-color: #f0c349;
+}
+
+.binding-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.binding-grid div {
+  border: 1px solid #30323a;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #20222a;
+}
+
+.binding-grid span {
+  color: #a8adb8;
+  font-size: 13px;
+}
+
+.binding-grid strong {
+  color: #f6f4ef;
+  font: 700 14px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@media (max-width: 680px) {
+  .rive-stage {
+    padding: 16px;
+    min-height: 520px;
+    grid-template-rows: 190px 260px;
+    gap: 18px;
+  }
+
+  .block-button-hitarea {
+    height: 190px;
+  }
+
+  .healthbar-canvas {
+    height: 260px;
+  }
+
+  .control-panel {
+    padding: 16px;
+  }
+
+  .control-header,
+  .binding-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .control-header {
+    align-items: stretch;
+  }
+
+  .value-readout {
+    width: fit-content;
+  }
+}

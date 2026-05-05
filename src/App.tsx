@@ -1,316 +1,275 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from 'react'
 import {
+  Alignment,
   Fit,
   Layout,
   useRive,
   useViewModel,
   useViewModelInstance,
-  useViewModelInstanceColor,
+  useViewModelInstanceBoolean,
   useViewModelInstanceNumber,
-  useViewModelInstanceTrigger,
-} from "@rive-app/react-webgl2";
-import { Heart, Minus, Palette, Play, Plus, RotateCcw } from "lucide-react";
+} from '@rive-app/react-webgl2'
+import './App.css'
 
-const RIVE_SRC = `${import.meta.env.BASE_URL}tamagochi.riv`;
-const CONTROL_COOLDOWN_MS = 320;
-const TRIGGERS = [
-  "death",
-  "zombie",
-  "revive",
-  "calmBreathingJogging",
-  "slumpedToDeath",
-  "slumpedOnBed",
-  "lyingOnSofa",
-  "slowBreathingSit",
-  "anxiousBreathing",
-  "sweepingStare",
-  "sittingGiggle",
-] as const;
+const HEALTHBAR_RIVE_SRC = `${import.meta.env.BASE_URL}healthbar.riv`
+const BLOCK_BUTTON_RIVE_SRC = `${import.meta.env.BASE_URL}block_button.riv`
+const VALUE_STEPS = Array.from({ length: 11 }, (_, index) => index / 10)
+const BLOCK_COLOR_VALUES = [1, 2, 3, 4]
+const LOW_HEALTH_THRESHOLD = 0.1
 
-const HEALTH_COLORS = [
-  { label: "Mint", value: [104, 190, 132] },
-  { label: "Gold", value: [242, 198, 109] },
-  { label: "Coral", value: [255, 137, 125] },
-] as const;
+function App() {
+  const [healthValue, setHealthValue] = useState(1)
+  const [blockColorValue, setBlockColorValue] = useState(2)
+  const [blockClicking, setBlockClicking] = useState(false)
+  const isLowHealth = healthValue <= LOW_HEALTH_THRESHOLD
+  const layout = useMemo(
+    () => new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
+    [],
+  )
 
-const clamp = (value: number, min: number, max: number) => {
-  return Math.min(max, Math.max(min, value));
-};
+  const { rive: blockRive, RiveComponent: BlockButtonRive } = useRive(
+    {
+      src: BLOCK_BUTTON_RIVE_SRC,
+      artboard: 'Button',
+      stateMachines: 'Interaction',
+      autoplay: true,
+      autoBind: true,
+      dispatchPointerExit: true,
+      layout,
+    },
+    {
+      shouldResizeCanvasToContainer: true,
+      useOffscreenRenderer: true,
+    },
+  )
 
-export function App() {
-  const [environment, setEnvironment] = useState(0);
-  const [health, setHealth] = useState(0.7);
-  const [activeColor, setActiveColor] = useState(0);
-  const [controlsLocked, setControlsLocked] = useState(false);
-  const cooldownTimerRef = useRef<number | null>(null);
+  const blockViewModel = useViewModel(blockRive, { name: 'ViewModel1' })
+  const blockViewModelInstance = useViewModelInstance(blockViewModel, {
+    rive: blockRive,
+    useDefault: true,
+  })
+  const blockNumberColor = useViewModelInstanceNumber(
+    'numberColor',
+    blockViewModelInstance,
+  )
+  const blockClickingBoolean = useViewModelInstanceBoolean(
+    'clickingBoolean',
+    blockViewModelInstance,
+  )
 
-  const layout = useMemo(() => new Layout({ fit: Fit.Contain }), []);
+  const { rive: healthRive, RiveComponent: HealthbarRive } = useRive(
+    {
+      src: HEALTHBAR_RIVE_SRC,
+      artboard: 'Health Bar',
+      stateMachines: 'Healthbar',
+      autoplay: true,
+      autoBind: true,
+      layout,
+    },
+    {
+      shouldResizeCanvasToContainer: true,
+      useOffscreenRenderer: true,
+    },
+  )
 
-  const { rive, RiveComponent } = useRive({
-    src: RIVE_SRC,
-    artboard: "MAIN",
-    stateMachines: "Interaction",
-    autoplay: true,
-    autoBind: false,
-    layout,
-  });
+  const viewModel = useViewModel(healthRive, { name: 'MainVM' })
+  const viewModelInstance = useViewModelInstance(viewModel, {
+    rive: healthRive,
+    useDefault: true,
+  })
+  const numberProperty = useViewModelInstanceNumber(
+    'healthbar',
+    viewModelInstance,
+  )
+  const booleanProperty = useViewModelInstanceBoolean(
+    'booleanProperty',
+    viewModelInstance,
+  )
 
-  const viewModel = useViewModel(rive, { name: "MainVM" });
-  const viewModelInstance = useViewModelInstance(viewModel, { rive, useDefault: true });
-  const environmentProperty = useViewModelInstanceNumber("environment", viewModelInstance);
-  const healthProperty = useViewModelInstanceNumber("healthbar", viewModelInstance);
-  const nestedHealthProperty = useViewModelInstanceNumber("propertyOfhealthBar/numberProperty", viewModelInstance);
-  const colorHealthbar = useViewModelInstanceColor("colorHealthbar", viewModelInstance);
-  const deathTrigger = useViewModelInstanceTrigger("death", viewModelInstance);
-  const zombieTrigger = useViewModelInstanceTrigger("zombie", viewModelInstance);
-  const reviveTrigger = useViewModelInstanceTrigger("revive", viewModelInstance);
-  const calmBreathingJoggingTrigger = useViewModelInstanceTrigger("calmBreathingJogging", viewModelInstance);
-  const slumpedToDeathTrigger = useViewModelInstanceTrigger("slumpedToDeath", viewModelInstance);
-  const slumpedOnBedTrigger = useViewModelInstanceTrigger("slumpedOnBed", viewModelInstance);
-  const lyingOnSofaTrigger = useViewModelInstanceTrigger("lyingOnSofa", viewModelInstance);
-  const slowBreathingSitTrigger = useViewModelInstanceTrigger("slowBreathingSit", viewModelInstance);
-  const anxiousBreathingTrigger = useViewModelInstanceTrigger("anxiousBreathing", viewModelInstance);
-  const sweepingStareTrigger = useViewModelInstanceTrigger("sweepingStare", viewModelInstance);
-  const sittingGiggleTrigger = useViewModelInstanceTrigger("sittingGiggle", viewModelInstance);
+  useEffect(() => {
+    numberProperty.setValue(healthValue)
+  }, [healthValue, numberProperty])
 
-  const triggerActions = useMemo(
-    () => ({
-      death: deathTrigger.trigger,
-      zombie: zombieTrigger.trigger,
-      revive: reviveTrigger.trigger,
-      calmBreathingJogging: calmBreathingJoggingTrigger.trigger,
-      slumpedToDeath: slumpedToDeathTrigger.trigger,
-      slumpedOnBed: slumpedOnBedTrigger.trigger,
-      lyingOnSofa: lyingOnSofaTrigger.trigger,
-      slowBreathingSit: slowBreathingSitTrigger.trigger,
-      anxiousBreathing: anxiousBreathingTrigger.trigger,
-      sweepingStare: sweepingStareTrigger.trigger,
-      sittingGiggle: sittingGiggleTrigger.trigger,
-    }),
-    [
-      anxiousBreathingTrigger.trigger,
-      calmBreathingJoggingTrigger.trigger,
-      deathTrigger.trigger,
-      lyingOnSofaTrigger.trigger,
-      reviveTrigger.trigger,
-      sittingGiggleTrigger.trigger,
-      slowBreathingSitTrigger.trigger,
-      slumpedOnBedTrigger.trigger,
-      slumpedToDeathTrigger.trigger,
-      sweepingStareTrigger.trigger,
-      zombieTrigger.trigger,
-    ],
-  );
+  useEffect(() => {
+    booleanProperty.setValue(isLowHealth)
+  }, [booleanProperty, isLowHealth])
 
-  const startControlsCooldown = useCallback(() => {
-    setControlsLocked(true);
-    if (cooldownTimerRef.current !== null) {
-      window.clearTimeout(cooldownTimerRef.current);
+  useEffect(() => {
+    blockNumberColor.setValue(blockColorValue)
+  }, [blockColorValue, blockNumberColor])
+
+  useEffect(() => {
+    blockClickingBoolean.setValue(blockClicking)
+  }, [blockClicking, blockClickingBoolean])
+
+  useEffect(() => {
+    if (!blockClicking) {
+      return
     }
-    cooldownTimerRef.current = window.setTimeout(() => {
-      setControlsLocked(false);
-      cooldownTimerRef.current = null;
-    }, CONTROL_COOLDOWN_MS);
-  }, []);
 
-  useEffect(() => {
+    const stopClicking = () => setBlockClicking(false)
+
+    window.addEventListener('pointerup', stopClicking)
+    window.addEventListener('pointercancel', stopClicking)
+    window.addEventListener('blur', stopClicking)
+
     return () => {
-      if (cooldownTimerRef.current !== null) {
-        window.clearTimeout(cooldownTimerRef.current);
-      }
-    };
-  }, []);
+      window.removeEventListener('pointerup', stopClicking)
+      window.removeEventListener('pointercancel', stopClicking)
+      window.removeEventListener('blur', stopClicking)
+    }
+  }, [blockClicking])
 
-  useEffect(() => {
-    environmentProperty.setValue?.(environment);
-  }, [environment, environmentProperty]);
+  const handleSliderChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = Math.round(Number(event.target.value) * 10) / 10
+    setHealthValue(Math.max(0, Math.min(1, nextValue)))
+  }
 
-  useEffect(() => {
-    healthProperty.setValue?.(health);
-    nestedHealthProperty.setValue?.(health);
-  }, [health, healthProperty, nestedHealthProperty]);
+  const handleBlockNumberChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const nextValue = Math.round(Number(event.target.value))
+    setBlockColorValue(Math.max(1, Math.min(4, nextValue)))
+  }
 
-  useEffect(() => {
-    const [red, green, blue] = HEALTH_COLORS[activeColor].value;
-    colorHealthbar.setRgb(red, green, blue);
-  }, [activeColor, colorHealthbar]);
+  const startBlockPress = () => {
+    setBlockClicking(true)
+  }
 
-  const nudgeEnvironment = (step: number) => {
-    startControlsCooldown();
-    setEnvironment((current) => clamp(current + step, 0, 4));
-  };
-
-  const fireAction = (action: () => void) => {
-    startControlsCooldown();
-    action();
-  };
-
-  const resetPet = () => {
-    startControlsCooldown();
-    setEnvironment(0);
-    setHealth(0.7);
-    setActiveColor(0);
-    reviveTrigger.trigger();
-  };
-
-  const canLowerEnvironment = environment > 0 && !controlsLocked;
-  const canRaiseEnvironment = environment < 4 && !controlsLocked;
+  const stopBlockPress = () => {
+    setBlockClicking(false)
+  }
 
   return (
     <main className="app-shell">
-      <section className="stage" aria-label="Tamagochi Rive controller">
-        <div className="title-bar">
-          <div>
-            <p className="eyebrow">Rive companion</p>
-            <h1>Tamagochi</h1>
-          </div>
-          <button className="icon-button" type="button" onClick={resetPet} disabled={controlsLocked} aria-label="Reset controls">
-            <RotateCcw size={20} />
-          </button>
+      <section className="rive-stage" aria-label="Rive previews">
+        <div className="block-button-hitarea">
+          <BlockButtonRive className="block-button-canvas" />
+          <div
+            className="block-button-target"
+            role="button"
+            tabIndex={0}
+            aria-label="Press block button"
+            aria-pressed={blockClicking}
+            onPointerDown={startBlockPress}
+            onPointerUp={stopBlockPress}
+            onPointerCancel={stopBlockPress}
+            onPointerLeave={(event) => {
+              if (event.buttons === 1) {
+                stopBlockPress()
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === ' ' || event.key === 'Enter') {
+                event.preventDefault()
+                startBlockPress()
+              }
+            }}
+            onKeyUp={(event) => {
+              if (event.key === ' ' || event.key === 'Enter') {
+                event.preventDefault()
+                stopBlockPress()
+              }
+            }}
+          />
         </div>
+        <HealthbarRive className="healthbar-canvas" />
+      </section>
 
-        <div className="content-grid">
-          <aside className="control-rail left-rail" aria-label="Environment controls">
-            <ControlButton label="Previous environment" onClick={() => nudgeEnvironment(-1)} disabled={!canLowerEnvironment}>
-              <Minus size={22} />
-            </ControlButton>
-            <div className="readout">
-              <span>environment</span>
-              <strong>{environment}</strong>
+      <section className="control-panel" aria-label="Health controls">
+        <div className="control-group">
+          <div className="control-header">
+            <div>
+              <h1>Block button</h1>
+              <p>ViewModel: ViewModel1</p>
             </div>
-            <ControlButton label="Next environment" onClick={() => nudgeEnvironment(1)} disabled={!canRaiseEnvironment}>
-              <Plus size={22} />
-            </ControlButton>
-          </aside>
-
-          <div className="rive-frame">
-            <RiveComponent className="rive-canvas" />
-            <div className="load-chip" aria-live="polite">
-              {rive ? "loaded" : "loading"}
-            </div>
+            <output className="value-readout" htmlFor="block-color-range">
+              {blockColorValue}
+            </output>
           </div>
 
-          <aside className="binding-panel" aria-label="All Rive bindings">
-            <div className="binding-list" aria-label="Scrollable Rive input list">
-              <BindingRow label="environment" type="Number">
-                <div className="stepper">
-                  <button type="button" aria-label="Decrease environment" onClick={() => nudgeEnvironment(-1)} disabled={!canLowerEnvironment}>
-                    <Minus size={16} />
-                  </button>
-                  <strong>{environment}</strong>
-                  <button type="button" aria-label="Increase environment" onClick={() => nudgeEnvironment(1)} disabled={!canRaiseEnvironment}>
-                    <Plus size={16} />
-                  </button>
-                </div>
-              </BindingRow>
-
-              <BindingRow label="healthbar" type="Number">
-                <strong>{health.toFixed(1)}</strong>
-              </BindingRow>
-
-              <BindingRow label="propertyOfhealthBar / numberProperty" type="Number">
-                <strong>{health.toFixed(1)}</strong>
-              </BindingRow>
-
-              <BindingRow label="colorHealthbar" type="Color">
-                <div className="swatches" aria-label="Health bar color">
-                  {HEALTH_COLORS.map((color, index) => (
-                    <button
-                      aria-label={`Set ${color.label} health color`}
-                      className={activeColor === index ? "is-selected" : ""}
-                      disabled={controlsLocked}
-                      key={color.label}
-                      onClick={() => {
-                        startControlsCooldown();
-                        setActiveColor(index);
-                      }}
-                      style={{ backgroundColor: `rgb(${color.value.join(" ")})` }}
-                      title={color.label}
-                      type="button"
-                    >
-                      <Palette size={14} />
-                    </button>
-                  ))}
-                </div>
-              </BindingRow>
-
-              {TRIGGERS.map((triggerName) => (
-                <BindingRow label={triggerName} type="Trigger" key={triggerName}>
-                  <button
-                    aria-label={`Trigger ${triggerName}`}
-                    className="trigger-button"
-                    disabled={controlsLocked}
-                    onClick={() => fireAction(triggerActions[triggerName])}
-                    type="button"
-                  >
-                    <Play size={16} />
-                  </button>
-                </BindingRow>
+          <div className="slider-row">
+            <input
+              id="block-color-range"
+              type="range"
+              min="1"
+              max="4"
+              step="1"
+              value={blockColorValue}
+              onChange={handleBlockNumberChange}
+              aria-label="Block button number color"
+            />
+            <div className="tick-row tick-row-four" aria-hidden="true">
+              {BLOCK_COLOR_VALUES.map((step) => (
+                <span key={step}>{step}</span>
               ))}
             </div>
+          </div>
 
-            <div className="health-card">
-              <label htmlFor="health">
-                <Heart size={18} />
-                <span>healthbar</span>
-              </label>
-              <input
-                id="health"
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={health}
-                disabled={controlsLocked}
-                onChange={(event) => setHealth(Number(event.target.value))}
-                onInput={(event) => setHealth(Number(event.currentTarget.value))}
-              />
-              <strong>{health.toFixed(1)}</strong>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={blockClicking}
+              onChange={(event) => setBlockClicking(event.target.checked)}
+            />
+            <span>clickingBoolean</span>
+          </label>
+
+          <div className="binding-grid">
+            <div>
+              <span>numberColor</span>
+              <strong>{blockColorValue}</strong>
             </div>
-          </aside>
+            <div>
+              <span>clickingBoolean</span>
+              <strong>{blockClicking ? 'true' : 'false'}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="control-group">
+        <div className="control-header">
+          <div>
+            <h1>Healthbar</h1>
+            <p>ViewModel: MainVM</p>
+          </div>
+          <output className="value-readout" htmlFor="health-range">
+            {healthValue.toFixed(1)}
+          </output>
+        </div>
+
+        <div className="slider-row">
+          <input
+            id="health-range"
+            type="range"
+            min="0"
+            max="1"
+            step="0.1"
+            value={healthValue}
+            onChange={handleSliderChange}
+            aria-label="Health value"
+          />
+          <div className="tick-row" aria-hidden="true">
+            {VALUE_STEPS.map((step) => (
+              <span key={step}>{step.toFixed(1)}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="binding-grid">
+          <div>
+            <span>healthbar</span>
+            <strong>{healthValue.toFixed(1)}</strong>
+          </div>
+          <div>
+            <span>booleanProperty</span>
+            <strong>{isLowHealth ? 'true' : 'false'}</strong>
+          </div>
+        </div>
         </div>
       </section>
     </main>
-  );
+  )
 }
 
-type ControlButtonProps = {
-  active?: boolean;
-  children: React.ReactNode;
-  disabled?: boolean;
-  label: string;
-  onClick: () => void;
-};
-
-function ControlButton({ active = false, children, disabled = false, label, onClick }: ControlButtonProps) {
-  return (
-    <button
-      aria-label={label}
-      className={`control-button${active ? " is-active" : ""}`}
-      disabled={disabled}
-      onClick={onClick}
-      title={label}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-}
-
-type BindingRowProps = {
-  children: React.ReactNode;
-  label: string;
-  type: string;
-};
-
-function BindingRow({ children, label, type }: BindingRowProps) {
-  return (
-    <div className="binding-row">
-      <div>
-        <strong>{label}</strong>
-        <span>{type}</span>
-      </div>
-      {children}
-    </div>
-  );
-}
+export default App
